@@ -880,6 +880,15 @@ def install_on_device_installer(args, step, steps):
         pmb.install.losetup.umount(args, img_path_src)
         pmb.helpers.run.root(args, ["mv", img_path_src, img_path_dest])
 
+    # Copy files specified with 'pmbootstrap install --ondev --cp'
+    if args.ondev_cp:
+        for host_src, chroot_dest in args.ondev_cp:
+            host_dest = f"{args.work}/chroot_{suffix_installer}/{chroot_dest}"
+            logging.info(f"({suffix_installer}) add {host_src} as"
+                         f" {chroot_dest}")
+            pmb.helpers.run.root(args, ["install", "-Dm644", host_src,
+                                        host_dest])
+
     # Run ondev-prepare, so it may generate nice configs from the channel
     # properties (e.g. to display the version number), or transform the image
     # file into another format. This can all be done without pmbootstrap
@@ -896,15 +905,6 @@ def install_on_device_installer(args, step, steps):
            "ONDEV_PMBOOTSTRAP_VERSION": pmb.__version__,
            "ONDEV_UI": args.ui}
     pmb.chroot.root(args, ["ondev-prepare"], suffix_installer, env=env)
-
-    # Copy files specified with 'pmbootstrap install --ondev --cp'
-    if args.ondev_cp:
-        for host_src, chroot_dest in args.ondev_cp:
-            host_dest = f"{args.work}/chroot_{suffix_installer}/{chroot_dest}"
-            logging.info(f"({suffix_installer}) add {host_src} as"
-                         f" {chroot_dest}")
-            pmb.helpers.run.root(args, ["install", "-Dm644", host_src,
-                                        host_dest])
 
     # Remove $DEVICE-boot.img (we will generate a new one if --split was
     # specified, otherwise the separate boot image is not needed)
