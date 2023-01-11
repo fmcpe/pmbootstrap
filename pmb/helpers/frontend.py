@@ -69,7 +69,7 @@ def _parse_suffix(args):
         return "native"
 
 
-def _install_ondev_verify_no_rootfs(args):
+def _install_ondev_verify_rootfs(args):
     chroot_dest = "/var/lib/rootfs.img"
     dest = f"{args.work}/chroot_installer_{args.device}{chroot_dest}"
     if os.path.exists(dest):
@@ -80,10 +80,10 @@ def _install_ondev_verify_no_rootfs(args):
             if chroot_dest_cp == chroot_dest:
                 return
 
-    raise ValueError(f"--no-rootfs set, but rootfs.img not found in install"
+    raise ValueError(f"--ondev set, but rootfs.img not found in install"
                      " chroot. Either run 'pmbootstrap install' without"
-                     " --no-rootfs first to let it generate the postmarketOS"
-                     " rootfs once, or supply a rootfs file with:"
+                     " --ondev first and move the resulting file to"
+                     f" {dest}, or supply a rootfs file with:"
                      f" --cp os.img:{chroot_dest}")
 
 
@@ -272,9 +272,10 @@ def install(args):
             raise ValueError("--no-rootfs can only be combined with --ondev."
                              " Do you mean --no-image?")
     if args.ondev_no_rootfs:
-        _install_ondev_verify_no_rootfs(args)
+        logging.note("NOTE: the --no-rootfs argument is obsolete, its behavior"
+                     " is the default now.")
 
-    # On-device installer overrides
+    # On-device installer overrides and checks
     if args.on_device_installer:
         # To make code for the on-device installer not needlessly complex, just
         # hardcode "user" as username here. (The on-device installer will set
@@ -286,6 +287,7 @@ def install(args):
                             " replaced with 'user' for the on-device"
                             " installer.")
             args.user = "user"
+        _install_ondev_verify_rootfs(args)
 
     if not args.sdcard and args.split is None:
         # Default to split if the flash method requires it

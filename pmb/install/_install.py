@@ -417,14 +417,6 @@ def print_sshd_info(args):
     logging.info("")  # make the note stand out
     logging.info("*** SSH DAEMON INFORMATION ***")
 
-    if not args.ondev_no_rootfs:
-        if args.no_sshd:
-            logging.info("SSH daemon is disabled (--no-sshd).")
-        else:
-            logging.info("SSH daemon is enabled (disable with --no-sshd).")
-            logging.info(f"Login as '{args.user}' with the password given"
-                         " during installation.")
-
     if args.on_device_installer:
         # We don't disable sshd in the installer OS. If the device is reachable
         # on the network by default (e.g. Raspberry Pi), one can lock down the
@@ -432,6 +424,14 @@ def print_sshd_info(args):
         logging.info("SSH daemon is enabled in the installer OS, to allow"
                      " debugging the installer image.")
         logging.info("More info: https://postmarketos.org/ondev-debug")
+        return
+
+    if args.no_sshd:
+        logging.info("SSH daemon is disabled (--no-sshd).")
+    else:
+        logging.info("SSH daemon is enabled (disable with --no-sshd).")
+        logging.info(f"Login as '{args.user}' with the password given during"
+                     " installation.")
 
 
 def disable_firewall(args):
@@ -853,13 +853,6 @@ def install_recovery_zip(args, steps):
 
 
 def install_on_device_installer(args, step, steps):
-    # Generate the rootfs image
-    if not args.ondev_no_rootfs:
-        suffix_rootfs = f"rootfs_{args.device}"
-        install_system_image(args, 0, suffix_rootfs, step=step, steps=steps,
-                             split=True)
-        step += 2
-
     # Prepare the installer chroot
     logging.info(f"*** ({step}/{steps}) CREATE ON-DEVICE INSTALLER ROOTFS ***")
     step += 1
@@ -870,15 +863,6 @@ def install_on_device_installer(args, step, steps):
 
     suffix_installer = f"installer_{args.device}"
     pmb.chroot.apk.install(args, packages, suffix_installer)
-
-    # Move rootfs image into installer chroot
-    img_path_dest = f"{args.work}/chroot_{suffix_installer}/var/lib/rootfs.img"
-    if not args.ondev_no_rootfs:
-        img = f"{args.device}-root.img"
-        img_path_src = f"{args.work}/chroot_native/home/pmos/rootfs/{img}"
-        logging.info(f"({suffix_installer}) add {img} as /var/lib/rootfs.img")
-        pmb.install.losetup.umount(args, img_path_src)
-        pmb.helpers.run.root(args, ["mv", img_path_src, img_path_dest])
 
     # Copy files specified with 'pmbootstrap install --ondev --cp'
     if args.ondev_cp:
@@ -906,17 +890,11 @@ def install_on_device_installer(args, step, steps):
            "ONDEV_UI": args.ui}
     pmb.chroot.root(args, ["ondev-prepare"], suffix_installer, env=env)
 
-    # Remove $DEVICE-boot.img (we will generate a new one if --split was
-    # specified, otherwise the separate boot image is not needed)
-    if not args.ondev_no_rootfs:
-        img_boot = f"{args.device}-boot.img"
-        logging.info(f"(native) rm {img_boot}")
-        pmb.chroot.root(args, ["rm", f"/home/pmos/rootfs/{img_boot}"])
-
     # Disable root login
     setup_login(args, suffix_installer)
 
     # Generate installer image
+    img_path_dest = f"{args.work}/chroot_{suffix_installer}/var/lib/rootfs.img"
     size_reserve = round(os.path.getsize(img_path_dest) / 1024 / 1024) + 200
     pmaports_cfg = pmb.config.pmaports.read_config(args)
     boot_label = pmaports_cfg.get("supported_install_boot_label",
@@ -1061,8 +1039,6 @@ def install(args):
         steps = 2
     elif args.android_recovery_zip:
         steps = 3
-    elif args.on_device_installer:
-        steps = 4 if args.ondev_no_rootfs else 7
     else:
         steps = 4
 
@@ -1073,15 +1049,13 @@ def install(args):
                            build=False)
     step += 1
 
-    if not args.ondev_no_rootfs:
-        create_device_rootfs(args, step, steps)
-        step += 1
-
     if args.on_device_installer:
-        # Runs install_system_image twice
         install_on_device_installer(args, step, steps)
         print_flash_info(args)
     else:
+        create_device_rootfs(args, step, steps)
+        step += 1
+
         if args.android_recovery_zip:
             install_recovery_zip(args, steps)
         elif not args.no_image:

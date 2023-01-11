@@ -173,11 +173,7 @@ def arguments_install(subparser):
                        help="copy one or more files from the host system path"
                             " HOST_SRC to the target path CHROOT_DEST")
     group.add_argument("--no-rootfs", dest="ondev_no_rootfs",
-                       help="do not generate a pmOS rootfs as"
-                            " /var/lib/rootfs.img (install chroot). The file"
-                            " must either exist from a previous"
-                            " 'pmbootstrap install' run or by providing it"
-                            " as CHROOT_DEST with --cp", action="store_true")
+                       action="store_true", help=argparse.SUPPRESS)
 
     # Other
     group = ret.add_argument_group("other optional arguments")
