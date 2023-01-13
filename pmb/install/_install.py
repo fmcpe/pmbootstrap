@@ -725,33 +725,7 @@ def install_system_image(args, size_reserve, suffix, step, steps,
                      "to sync, please wait)")
     pmb.chroot.shutdown(args, True)
 
-    # Convert rootfs to sparse using img2simg
-    sparse = args.sparse
-    if sparse is None:
-        sparse = args.deviceinfo["flash_sparse"] == "true"
-
-    if sparse and not split and not sdcard:
-        logging.info("(native) make sparse rootfs")
-        pmb.chroot.apk.install(args, ["android-tools"])
-        sys_image = args.device + ".img"
-        sys_image_sparse = args.device + "-sparse.img"
-        pmb.chroot.user(args, ["img2simg", sys_image, sys_image_sparse],
-                        working_dir="/home/pmos/rootfs/")
-        pmb.chroot.user(args, ["mv", "-f", sys_image_sparse, sys_image],
-                        working_dir="/home/pmos/rootfs/")
-
-        # patch sparse image for Samsung devices if specified
-        samsungify_strategy = args.deviceinfo["flash_sparse_samsung_format"]
-        if samsungify_strategy:
-            logging.info("(native) convert sparse image into Samsung's sparse image format")
-            pmb.chroot.apk.install(args, ["sm-sparse-image-tool"])
-            sys_image = f"{args.device}.img"
-            sys_image_patched = f"{args.device}-patched.img"
-            pmb.chroot.user(args, ["sm_sparse_image_tool", "samsungify", "--strategy",
-                                   samsungify_strategy, sys_image, sys_image_patched],
-                            working_dir="/home/pmos/rootfs/")
-            pmb.chroot.user(args, ["mv", "-f", sys_image_patched, sys_image],
-                            working_dir="/home/pmos/rootfs/")
+    pmb.install.blockdevice.convert_rootfs_to_sparse(args)
 
 
 def print_flash_info(args):
