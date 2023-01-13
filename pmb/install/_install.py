@@ -1077,19 +1077,18 @@ def install(args):
         create_device_rootfs(args, step, steps)
         step += 1
 
-    if args.no_image:
-        return
-    elif args.android_recovery_zip:
-        return install_recovery_zip(args, steps)
-
     if args.on_device_installer:
         # Runs install_system_image twice
         install_on_device_installer(args, step, steps)
+        print_flash_info(args)
     else:
-        install_system_image(args, 0, f"rootfs_{args.device}", step, steps,
-                             split=args.split, sdcard=args.sdcard)
+        if args.android_recovery_zip:
+            install_recovery_zip(args, steps)
+        elif not args.no_image:
+            install_system_image(args, 0, f"rootfs_{args.device}", step, steps,
+                                 split=args.split, sdcard=args.sdcard)
+            print_flash_info(args)
 
-    print_flash_info(args)
     print_sshd_info(args)
     print_firewall_info(args)
 
