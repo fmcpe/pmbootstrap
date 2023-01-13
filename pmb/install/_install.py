@@ -688,28 +688,31 @@ def install_system_image(args, size_reserve, suffix, step, steps,
     :param split: create separate images for boot and root partitions
     :param sdcard: path to sdcard device (e.g. /dev/mmcblk0) or None
     """
-    # Partition and fill image/sdcard
     logging.info(f"*** ({step}/{steps}) PREPARE INSTALL BLOCKDEVICE ***")
     pmb.chroot.shutdown(args, True)
     (size_boot, size_root) = get_subpartitions_size(args, suffix)
     layout = get_partition_layout(size_reserve, args.deviceinfo["cgpt_kpart"])
     if not args.rsync:
+        # Create blockdevice and make it available inside native chroot
         pmb.install.blockdevice.create(args, size_boot, size_root,
                                        size_reserve, split, sdcard)
         if not split:
             pmb.install.partition(args, layout, size_boot, size_reserve)
     if not split:
+        # Make partition blockdevices available inside native chroot
         pmb.install.partitions_mount(args, layout, sdcard)
 
+    # Format root and boot partitions and mount them
     pmb.install.format(args, layout, boot_label, root_label, sdcard)
 
-    # Just copy all the files
+    # Copy files to root and boot partitions
     logging.info(f"*** ({step + 1}/{steps}) FILL INSTALL BLOCKDEVICE ***")
     copy_files_from_chroot(args, suffix)
     create_home_from_skel(args)
     configure_apk(args)
     copy_ssh_keys(args)
 
+    # Add bootloader quirks
     # Don't try to embed firmware and cgpt on split images since there's no
     # place to put it and it will end up in /dev of the chroot instead
     if not split:
