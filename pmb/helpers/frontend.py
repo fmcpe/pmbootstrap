@@ -261,7 +261,9 @@ def install(args):
         if args.filesystem:
             raise ValueError("--on-device-installer cannot be combined with"
                              " --filesystem")
-
+        if args.split:
+            raise ValueError("--on-device-installer cannot be combined with"
+                             " --split")
         if args.deviceinfo["cgpt_kpart"]:
             raise ValueError("--on-device-installer cannot be used with"
                              " ChromeOS devices")
