@@ -70,6 +70,12 @@ def _parse_suffix(args):
 
 
 def _install_ondev_verify_rootfs(args):
+    if args.ondev2_image:
+        if os.path.exists(args.ondev2_image):
+            return
+        else:
+            raise ValueError(f"File not found: {args.ondev2_image}")
+
     chroot_dest = "/var/lib/rootfs.img"
     dest = f"{args.work}/chroot_installer_{args.device}{chroot_dest}"
     if os.path.exists(dest):
@@ -81,9 +87,9 @@ def _install_ondev_verify_rootfs(args):
                 return
 
     raise ValueError(f"--ondev set, but rootfs.img not found in install"
-                     " chroot. Either run 'pmbootstrap install' without"
-                     " --ondev first and move the resulting file to"
-                     f" {dest}, or supply a rootfs file with:"
+                     " chroot. Set --ondev2-rootfs, or run 'pmbootstrap"
+                     " install' without --ondev first and move the resulting"
+                     f" file to {dest}, or supply a rootfs file with:"
                      f" --cp os.img:{chroot_dest}")
 
 

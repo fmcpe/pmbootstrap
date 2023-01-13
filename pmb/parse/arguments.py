@@ -174,6 +174,11 @@ def arguments_install(subparser):
                             " HOST_SRC to the target path CHROOT_DEST")
     group.add_argument("--no-rootfs", dest="ondev_no_rootfs",
                        action="store_true", help=argparse.SUPPRESS)
+    group.add_argument("--ondev2-image",
+                       help="assume the on-device installer is running in"
+                            " initramfs (ondev2). After running ondev-prepare,"
+                            " replace the entire root partition of the"
+                            " installer with this file.")
 
     # Other
     group = ret.add_argument_group("other optional arguments")

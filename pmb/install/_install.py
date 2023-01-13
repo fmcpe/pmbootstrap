@@ -1,6 +1,7 @@
 # Copyright 2023 Oliver Smith
 # SPDX-License-Identifier: GPL-3.0-or-later
 import logging
+import math
 import os
 import re
 import glob
@@ -145,6 +146,23 @@ def copy_files_from_chroot(args, suffix):
     else:
         pmb.chroot.root(args, ["cp", "-a"] + folders + ["/mnt/install/"],
                         working_dir=mountpoint)
+
+
+def copy_files_from_chroot_boot(args, suffix):
+    """
+    Copy all files from the /boot directory of the rootfs chroot to
+    /mnt/install/boot. This is a simpler version of copy_files_from_chroot
+    (which also copies the boot directory along with all other files).
+
+    :param suffix: the chroot suffix, e.g. "installer_qemu-amd64"
+    """
+    # Mount the device rootfs
+    logging.info(f"(native) copy /boot dir of {suffix} to /mnt/install/boot")
+    mountpoint = mount_device_rootfs(args, suffix)
+
+    # Copy all files
+    pmb.chroot.root(args, ["cp", "-a", "boot", "/mnt/install/"],
+                    working_dir=mountpoint)
 
 
 def create_home_from_skel(args):
@@ -702,6 +720,63 @@ def install_system_image(args, size_reserve, suffix, step, steps,
     pmb.install.blockdevice.convert_rootfs_to_sparse(args)
 
 
+def install_system_image_ondev2(args, size_reserve, size_os_image, suffix,
+                                step, steps, boot_label, sdcard):
+    """
+    Finish up an ondev2 based installer image. With ondev2, the installer code
+    lives inside initramfs-extra in the boot partition. The root partition of
+    the installer that was built along with the boot partition gets discarded,
+    instead the resulting image will directly have the OS image there.
+
+    [installer boot partition with ondev2] [free space] [os image]
+
+    :param size_reserve: empty partition between root and boot in MiB (pma#463)
+    :param size_os_image: size of the os image in MiB
+    :param suffix: the chroot suffix of the installer
+    :param step: next installation step
+    :param steps: total installation steps
+    :param boot_label: label of the boot partition (e.g. "pmOS_boot")
+    :param sdcard: path to sdcard device (e.g. /dev/mmcblk0) or None
+    """
+    logging.info(f"*** ({step}/{steps}) PREPARE INSTALL BLOCKDEVICE ***")
+    # Create blockdevice and make it available inside native chroot
+    pmb.chroot.shutdown(args, True)
+    size_boot = int(args.boot_size)
+    layout = pmb.install.get_partition_layout(args, size_reserve)
+    pmb.install.blockdevice.create(args, size_boot, size_os_image,
+                                   size_reserve, False, sdcard)
+    pmb.install.partition(args, layout, size_boot, size_reserve)
+
+    # Make partition blockdevices available inside native chroot
+    pmb.install.partitions_mount(args, layout, sdcard)
+
+    # Format boot partition and mount it
+    boot_dev = f"/dev/installp{layout['boot']}"
+    pmb.install.format_and_mount_boot(args, boot_dev, boot_label)
+
+    logging.info(f"*** ({step + 1}/{steps}) FILL INSTALL BLOCKDEVICE ***")
+    # Copy files from boot partition
+    copy_files_from_chroot_boot(args, suffix)
+
+    # Copy the OS image
+    dev_os_image = f"/dev/installp{layout['root']}"
+    dev_os_image_outside = f"{args.work}/chroot_native{dev_os_image}"
+    logging.info(f"(native) copy image {args.ondev2_image} to {dev_os_image}")
+    pmb.helpers.run.root(args, ["dd", f"if={args.ondev2_image}",
+                         f"of={dev_os_image_outside}", "bs=4M"])
+
+    # Add bootloader quirks
+    embed_firmware(args, suffix)
+    write_cgpt_kpart(args, layout, suffix)
+
+    if sdcard:
+        logging.info("Unmounting SD card (this may take a while "
+                     "to sync, please wait)")
+    pmb.chroot.shutdown(args, True)
+
+    pmb.install.blockdevice.convert_rootfs_to_sparse(args)
+
+
 def print_flash_info(args):
     """ Print flashing information, based on the deviceinfo data and the
         pmbootstrap arguments. """
@@ -838,17 +913,29 @@ def install_on_device_installer(args, step, steps):
            "ONDEV_UI": args.ui}
     pmb.chroot.root(args, ["ondev-prepare"], suffix_installer, env=env)
 
-    # Disable root login
-    setup_login(args, suffix_installer)
+    if args.ondev2_image:
+        img_path_dest = args.ondev2_image
+    else:
+        # Disable root login
+        setup_login(args, suffix_installer)
 
-    # Generate installer image
-    img_path_dest = f"{args.work}/chroot_{suffix_installer}/var/lib/rootfs.img"
-    size_reserve = round(os.path.getsize(img_path_dest) / 1024 / 1024) + 200
+        img_path_dest = f"{args.work}/chroot_{suffix_installer}/var/lib/rootfs.img"
+
+    # Get parameters for install_system_image
+    size_os_image = math.ceil(os.path.getsize(img_path_dest) / (1024**2))
+    size_reserve = size_os_image + 200
     pmaports_cfg = pmb.config.pmaports.read_config(args)
     boot_label = pmaports_cfg.get("supported_install_boot_label",
                                   "pmOS_inst_boot")
-    install_system_image(args, size_reserve, suffix_installer, step, steps,
-                         boot_label, "pmOS_install", args.split, args.sdcard)
+
+    if args.ondev2_image:
+        install_system_image_ondev2(args, size_reserve, size_os_image,
+                                    suffix_installer, step, steps, boot_label,
+                                    args.sdcard)
+    else:
+        install_system_image(args, size_reserve, suffix_installer, step, steps,
+                             boot_label, "pmOS_install", args.split,
+                             args.sdcard)
 
 
 def get_selected_providers(args, packages):
