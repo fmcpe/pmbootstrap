@@ -649,31 +649,6 @@ def sanity_check_ondev_version(args):
                            f" / in the binary packages has version {ver_pkg}.")
 
 
-def get_partition_layout(reserve, kernel):
-    """
-    :param reserve: create an empty partition between root and boot (pma#463)
-    :param kernel: create a separate kernel partition before all other
-                   partitions, e.g. for the ChromeOS devices with cgpt
-    :returns: the partition layout, e.g. without reserve and kernel:
-              {"kernel": None, "boot": 1, "reserve": None, "root": 2}
-    """
-    ret = {}
-    ret["kernel"] = None
-    ret["boot"] = 1
-    ret["reserve"] = None
-    ret["root"] = 2
-
-    if kernel:
-        ret["kernel"] = 1
-        ret["boot"] += 1
-        ret["root"] += 1
-
-    if reserve:
-        ret["reserve"] = ret["root"]
-        ret["root"] += 1
-    return ret
-
-
 def install_system_image(args, size_reserve, suffix, step, steps,
                          boot_label="pmOS_boot", root_label="pmOS_root",
                          split=False, sdcard=None):
@@ -691,7 +666,8 @@ def install_system_image(args, size_reserve, suffix, step, steps,
     logging.info(f"*** ({step}/{steps}) PREPARE INSTALL BLOCKDEVICE ***")
     pmb.chroot.shutdown(args, True)
     (size_boot, size_root) = get_subpartitions_size(args, suffix)
-    layout = get_partition_layout(size_reserve, args.deviceinfo["cgpt_kpart"])
+    layout = pmb.install.get_partition_layout(size_reserve,
+                                              args.deviceinfo["cgpt_kpart"])
     if not args.rsync:
         # Create blockdevice and make it available inside native chroot
         pmb.install.blockdevice.create(args, size_boot, size_root,

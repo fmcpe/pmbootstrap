@@ -8,6 +8,31 @@ import pmb.config
 import pmb.install.losetup
 
 
+def get_partition_layout(reserve, kernel):
+    """
+    :param reserve: create an empty partition between root and boot (pma#463)
+    :param kernel: create a separate kernel partition before all other
+                   partitions, e.g. for the ChromeOS devices with cgpt
+    :returns: the partition layout, e.g. without reserve and kernel:
+              {"kernel": None, "boot": 1, "reserve": None, "root": 2}
+    """
+    ret = {}
+    ret["kernel"] = None
+    ret["boot"] = 1
+    ret["reserve"] = None
+    ret["root"] = 2
+
+    if kernel:
+        ret["kernel"] = 1
+        ret["boot"] += 1
+        ret["root"] += 1
+
+    if reserve:
+        ret["reserve"] = ret["root"]
+        ret["root"] += 1
+    return ret
+
+
 def partitions_mount(args, layout, sdcard):
     """
     Mount blockdevices of partitions inside native chroot
