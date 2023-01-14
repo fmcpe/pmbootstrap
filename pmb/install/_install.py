@@ -666,8 +666,7 @@ def install_system_image(args, size_reserve, suffix, step, steps,
     logging.info(f"*** ({step}/{steps}) PREPARE INSTALL BLOCKDEVICE ***")
     pmb.chroot.shutdown(args, True)
     (size_boot, size_root) = get_subpartitions_size(args, suffix)
-    layout = pmb.install.get_partition_layout(size_reserve,
-                                              args.deviceinfo["cgpt_kpart"])
+    layout = pmb.install.get_partition_layout(args, size_reserve)
     if not args.rsync:
         # Create blockdevice and make it available inside native chroot
         pmb.install.blockdevice.create(args, size_boot, size_root,

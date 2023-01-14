@@ -8,11 +8,9 @@ import pmb.config
 import pmb.install.losetup
 
 
-def get_partition_layout(reserve, kernel):
+def get_partition_layout(args, reserve):
     """
     :param reserve: create an empty partition between root and boot (pma#463)
-    :param kernel: create a separate kernel partition before all other
-                   partitions, e.g. for the ChromeOS devices with cgpt
     :returns: the partition layout, e.g. without reserve and kernel:
               {"kernel": None, "boot": 1, "reserve": None, "root": 2}
     """
@@ -22,7 +20,7 @@ def get_partition_layout(reserve, kernel):
     ret["reserve"] = None
     ret["root"] = 2
 
-    if kernel:
+    if args.deviceinfo["cgpt_kpart"]:
         ret["kernel"] = 1
         ret["boot"] += 1
         ret["root"] += 1
