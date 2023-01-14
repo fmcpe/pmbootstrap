@@ -52,7 +52,7 @@ def partitions_mount(args, layout, sdcard):
         pmb.helpers.mount.bind_file(args, source, target)
 
 
-def partition(args, layout, size_boot, size_reserve):
+def partition_regular(args, layout, size_boot, size_reserve):
     """
     Partition /dev/install and create /dev/install{p1,p2,p3}:
     * /dev/installp1: boot
@@ -199,3 +199,15 @@ def partition_cgpt(args, layout, size_boot, size_reserve):
 
     for command in commands:
         pmb.chroot.root(args, command, check=False)
+
+
+def partition(args, layout, size_boot, size_reserve):
+    """
+    :param layout: partition layout from get_partition_layout()
+    :param size_boot: size of the boot partition in MiB
+    :param size_reserve: empty partition between root and boot in MiB (pma#463)
+    """
+    if args.deviceinfo["cgpt_kpart"]:
+        partition_cgpt(args, layout, size_boot, size_reserve)
+    else:
+        partition_regular(args, layout, size_boot, size_reserve)
