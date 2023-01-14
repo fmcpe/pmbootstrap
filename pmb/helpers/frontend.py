@@ -270,9 +270,10 @@ def install(args):
         if args.split:
             raise ValueError("--on-device-installer cannot be combined with"
                              " --split")
-        if args.deviceinfo["cgpt_kpart"]:
+        if args.deviceinfo["cgpt_kpart"] and not args.ondev2_image:
             raise ValueError("--on-device-installer cannot be used with"
-                             " ChromeOS devices")
+                             " ChromeOS devices, unless also using"
+                             " --ondev2-image")
     else:
         if args.ondev_cp:
             raise ValueError("--cp can only be combined with --ondev")
