@@ -877,7 +877,7 @@ def install_recovery_zip(args, steps):
 
 def install_on_device_installer(args, step, steps):
     # Prepare the installer chroot
-    logging.info(f"*** ({step}/{steps}) CREATE ON-DEVICE INSTALLER ROOTFS ***")
+    logging.info(f"*** ({step}/{steps}) CREATE ON-DEVICE INSTALLER IMAGE ***")
     step += 1
     packages = ([f"device-{args.device}",
                  "postmarketos-ondev"] +
