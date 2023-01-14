@@ -897,9 +897,7 @@ def install_on_device_installer(args, step, steps):
                                         host_dest])
 
     # Run ondev-prepare, so it may generate nice configs from the channel
-    # properties (e.g. to display the version number), or transform the image
-    # file into another format. This can all be done without pmbootstrap
-    # changes in the postmarketos-ondev package.
+    # properties (e.g. to display the version number)
     logging.info(f"({suffix_installer}) ondev-prepare")
     channel = pmb.config.pmaports.read_config(args)["channel"]
     channel_cfg = pmb.config.pmaports.read_config_channel(args)
