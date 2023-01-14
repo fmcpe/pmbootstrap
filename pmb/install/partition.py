@@ -15,9 +15,14 @@ def get_partition_layout(args, reserve):
               {"kernel": None, "boot": 1, "reserve": None, "root": 2}
     """
     ret = {}
+    # Separate kernel partition (cgpt_kpart)
     ret["kernel"] = None
+    # Boot partition for /boot
     ret["boot"] = 1
+    # Reserved space for the on-device installer (ondev1 and ondev2)
     ret["reserve"] = None
+    # Root partition for /, or with FDE the encrypted partition containing /,
+    # or with ondev2 the OS image
     ret["root"] = 2
 
     if args.deviceinfo["cgpt_kpart"]:
