@@ -88,7 +88,7 @@ def partition_regular(args, layout, size_boot, size_reserve):
     * /dev/installp3: (root, if reserved space > 0)
 
     When adjusting this function, make sure to also adjust
-    ondev-prepare-internal-storage.sh in postmarketos-ondev.git!
+    od2_install_step_create_partition_table_regular in ondev2.git!
 
     :param layout: partition layout from get_partition_layout()
     :param size_boot: size of the boot partition in MiB
@@ -143,6 +143,9 @@ def partition_cgpt(args, layout, size_boot, size_reserve):
     """
     This function does similar functionality to partition(), but this
     one is for ChromeOS devices which use special GPT.
+
+    When adjusting this function, make sure to also adjust
+    od2_install_step_create_partition_table_cgpt in ondev2.git!
 
     :param layout: partition layout from get_partition_layout()
     :param size_boot: size of the boot partition in MiB
