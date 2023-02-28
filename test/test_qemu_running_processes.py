@@ -75,14 +75,19 @@ class QEMU(object):
         pmbootstrap_run(args, config, ["config", "kernel", "virt"])
         pmbootstrap_run(args, config, ["config", "extra_packages", "none"])
         pmbootstrap_run(args, config, ["config", "user", "testuser"])
+        pmbootstrap_run(args, config, ["config", "ssh_key_glob", "~/.local/var/pmbootstrap/chroot_native/home/pmos/ssh_id_ed25519.pub"])
         pmbootstrap_run(args, config, ["config", "ui", ui])
 
         # Prepare native chroot
         pmbootstrap_run(args, config, ["-y", "zap"])
-        pmb.chroot.apk.install(args, ["openssh-client", "sshpass"])
+        pmb.chroot.apk.install(args, ["openssh-client"])
+        pmb.chroot.user(args, ["ssh-keygen", "-t", "ed25519", "-f", "/home/pmos/.ssh/id_ed25519", "-N", "",])
+        # Make sure the host can see the pubkey
+        pmb.chroot.user(args, ["cp", "/home/pmos/.ssh/id_ed25519.pub", "/home/pmos/ssh_id_ed25519.pub"])
+        pmb.chroot.user(args, ["chmod", "644", "/home/pmos/ssh_id_ed25519.pub"])
 
         # Create and run rootfs
-        pmbootstrap_yes(args, config, ["install"])
+        pmbootstrap_yes(args, config, ["install", "--password", "y"])
         self.process = pmbootstrap_run(args, config, ["qemu", "--display",
                                                       "none"], "background")
 
@@ -99,7 +104,7 @@ def ssh_run(args, command):
     :param command: flat string of the command to execute, e.g. "ps au"
     :returns: the result from the SSH server
     """
-    ret = pmb.chroot.user(args, ["sshpass", "-py", "ssh",
+    ret = pmb.chroot.user(args, ["ssh",
                                  "-o", "ConnectTimeout=10",
                                  "-o", "UserKnownHostsFile=/dev/null",
                                  "-o", "StrictHostKeyChecking=no",
