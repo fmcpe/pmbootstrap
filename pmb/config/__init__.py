@@ -257,6 +257,7 @@ chroot_device_nodes = [
     [666, "c", 1, 3, "null"],
     [666, "c", 1, 5, "zero"],
     [666, "c", 1, 7, "full"],
+    [666, "c", 5, 2, "ptmx"],
     [644, "c", 1, 8, "random"],
     [644, "c", 1, 9, "urandom"],
 ]

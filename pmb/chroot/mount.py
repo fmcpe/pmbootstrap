@@ -70,6 +70,9 @@ def mount_dev_tmpfs(args, suffix="native"):
     pmb.helpers.run.root(args, ["mount", "-t", "tmpfs",
                                 "-o", "nodev,nosuid,noexec",
                                 "tmpfs", dev + "/shm"])
+    pmb.helpers.run.root(args, ["mount", "-t", "devpts",
+                                "-o", "defaults",
+                                "devpts", dev + "/pts"])
     create_device_nodes(args, suffix)
 
     # Setup /dev/fd as a symlink
