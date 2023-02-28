@@ -32,13 +32,6 @@ def args(request):
     return args
 
 
-def ssh_create_askpass_script(args):
-    """Create /tmp/y.sh, which we need to automatically login via SSH."""
-    with open(args.work + "/chroot_native/tmp/y.sh", "w") as handle:
-        handle.write("#!/bin/sh\necho y\n")
-    pmb.chroot.root(args, ["chmod", "+x", "/tmp/y.sh"])
-
-
 def pmbootstrap_run(args, config, parameters, output="log"):
     """Execute pmbootstrap.py with a test pmbootstrap.conf."""
     return pmb.helpers.run.user(args, ["./pmbootstrap.py", "-c", config] +
@@ -86,8 +79,7 @@ class QEMU(object):
 
         # Prepare native chroot
         pmbootstrap_run(args, config, ["-y", "zap"])
-        pmb.chroot.apk.install(args, ["openssh-client"])
-        ssh_create_askpass_script(args)
+        pmb.chroot.apk.install(args, ["openssh-client", "sshpass"])
 
         # Create and run rootfs
         pmbootstrap_yes(args, config, ["install"])
@@ -107,7 +99,7 @@ def ssh_run(args, command):
     :param command: flat string of the command to execute, e.g. "ps au"
     :returns: the result from the SSH server
     """
-    ret = pmb.chroot.user(args, ["SSH_ASKPASS=/tmp/y.sh", "DISPLAY=", "ssh",
+    ret = pmb.chroot.user(args, ["sshpass", "-py", "ssh",
                                  "-o", "ConnectTimeout=10",
                                  "-o", "UserKnownHostsFile=/dev/null",
                                  "-o", "StrictHostKeyChecking=no",
