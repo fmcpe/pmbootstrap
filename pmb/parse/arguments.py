@@ -494,6 +494,14 @@ def arguments_kconfig(subparser):
     migrate.add_argument("--arch", choices=arch_choices, dest="arch")
     add_kernel_arg(migrate)
 
+    # "pmbootstrap kconfig merge"
+    merge = sub.add_parser("merge",
+                           help="Merge a kernel config fragment into the"
+                                " given kernel config")
+    merge.add_argument("--arch", choices=arch_choices, dest="arch")
+    merge.add_argument("fragment", help="path to the kernel config fragment")
+    add_kernel_arg(merge, nargs=None)
+
 
 def arguments_repo_missing(subparser):
     ret = subparser.add_parser("repo_missing")

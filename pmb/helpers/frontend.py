@@ -433,6 +433,10 @@ def kconfig(args):
             pkgname = args.deviceinfo["codename"]
         use_oldconfig = args.action_kconfig == "migrate"
         pmb.build.menuconfig(args, pkgname, use_oldconfig)
+    elif args.action_kconfig == "merge":
+        if not os.path.exists(args.fragment):
+            raise ValueError(f"fragment not found: {args.fragment}")
+        pmb.build.kconfig.merge(args, args.package, args.fragment)
 
 
 def deviceinfo_parse(args):

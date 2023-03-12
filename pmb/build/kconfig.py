@@ -157,3 +157,41 @@ def menuconfig(args, pkgname, use_oldconfig):
 
     # Check config
     pmb.parse.kconfig.check(args, apkbuild["_flavor"], details=True)
+
+
+def merge(args, pkgname, fragment_path):
+    if not pkgname.startswith("linux-"):
+        pkgname = "linux-" + pkgname
+
+    aport = pmb.helpers.pmaports.find(args, pkgname)
+    apkbuild = pmb.parse.apkbuild(f"{aport}/APKBUILD")
+    arch = args.arch or get_arch(apkbuild)
+
+    pmb.build.init_compiler(args, [], "native", arch)
+    extract_and_patch_sources(args, pkgname, arch)
+
+    # Copy fragment into chroot
+    target = f"{args.work}/chroot_native/tmp/fragment"
+    pmb.helpers.run.user(args, ["cp", fragment_path, target])
+
+    outputdir = get_outputdir(args, pkgname, apkbuild)
+    # FIXME: this doesn't work as expected yet? tried to unset an option with
+    # a fragment and it did not work
+    cmd = ["scripts/kconfig/merge_config.sh", "-m", "-n", ".config", "/tmp/fragment"]
+    pmb.chroot.user(args, cmd, "native", outputdir)
+
+    cmd = ["make", "olddefconfig"]
+    pmb.chroot.user(args, cmd, "native", outputdir)
+
+    # FIXME: duplicated from code above, move to shared func
+    # Find the updated config
+    source = args.work + "/chroot_native" + outputdir + "/.config"
+    if not os.path.exists(source):
+        raise RuntimeError("No kernel config generated: " + source)
+
+    # Update the aport (config and checksum)
+    logging.info("Copy kernel config back to aport-folder")
+    config = "config-" + apkbuild["_flavor"] + "." + arch
+    target = aport + "/" + config
+    pmb.helpers.run.user(args, ["cp", source, target])
+    pmb.build.checksum.update(args, pkgname)
