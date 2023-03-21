@@ -6,7 +6,7 @@ import os
 import pmb.config
 import pmb.parse
 import pmb.helpers.mount
-
+from pmb.helpers.run import which
 
 def create_device_nodes(args, suffix):
     """
@@ -56,7 +56,7 @@ def mount_dev_tmpfs(args, suffix="native"):
     """
     # Do nothing when it is already mounted
     dev = args.work + "/chroot_" + suffix + "/dev"
-    if pmb.helpers.mount.ismount(dev):
+    if pmb.helpers.mount.ismount(dev) or pmb.config.rootless:
         return
 
     # Create the $chroot/dev folder and mount tmpfs there
@@ -83,6 +83,9 @@ def mount(args, suffix="native"):
     # Mount tmpfs as the chroot's /dev
     mount_dev_tmpfs(args, suffix)
 
+    if pmb.config.rootless and os.path.exists(f"{args.work}/config_proot/proot_{suffix}.cfg"):
+        return
+
     # Get all mountpoints
     arch = pmb.parse.arch.from_chroot_suffix(args, suffix)
     channel = pmb.config.pmaports.read_config(args)["channel"]
@@ -92,6 +95,9 @@ def mount(args, suffix="native"):
         source = source.replace("$ARCH", arch)
         source = source.replace("$CHANNEL", channel)
         mountpoints[source] = target
+
+    mountpoints[which("sh")] = "/bin/sh_host"
+    #mountpoints[which("cat")] = "/bin/cat_host"
 
     # Mount if necessary
     for source, target in mountpoints.items():

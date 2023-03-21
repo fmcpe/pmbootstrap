@@ -1,7 +1,24 @@
 # Copyright 2023 Oliver Smith
 # SPDX-License-Identifier: GPL-3.0-or-later
 import shlex
+import shutil
 import pmb.helpers.run_core
+import pmb.config
+from functools import lru_cache
+
+@lru_cache(maxsize=32)
+def which(binary):
+    """
+    Get the absolute paths and default args of an executable
+    :param binary: the name of the executable
+    """
+    path = shutil.which(binary, path=pmb.config.chroot_host_path)
+    if not path:
+        raise RuntimeError(f"Could not find the '{binary}'"
+                            " executable. Make sure that it is in"
+                            " your current user's PATH.")
+    
+    return path
 
 
 def flat_cmd(cmd, working_dir=None, env={}):
@@ -72,7 +89,10 @@ def root(args, cmd, working_dir=None, output="log", output_return=False,
     """
     if env:
         cmd = ["sh", "-c", flat_cmd(cmd, env=env)]
-    cmd = [pmb.config.sudo] + cmd
+    if pmb.config.rootless:
+        cmd = [which("fakeroot"), "--unknown-is-real", "--"] + cmd
+    else:
+        cmd = [pmb.config.sudo] + cmd
 
     return user(args, cmd, working_dir, output, output_return, check, env,
                 True)

@@ -81,6 +81,10 @@ def shutdown(args, only_install_related=False):
     for marker in glob.glob(f"{args.work}/chroot_*/in-pmbootstrap"):
         pmb.helpers.run.root(args, ["rm", marker])
 
+    # Remove proot mount configs so they don't go stale
+    for marker in glob.glob(f"{args.work}/config_proot/proot_*.cfg"):
+        pmb.helpers.run.root(args, ["rm", marker])
+
     if not only_install_related:
         # Umount all folders inside args.work
         # The folders are explicitly iterated over, so folders symlinked inside

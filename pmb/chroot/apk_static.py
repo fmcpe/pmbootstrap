@@ -9,6 +9,7 @@ import stat
 
 import pmb.helpers.apk
 import pmb.helpers.run
+import pmb.helpers.mount
 import pmb.config
 import pmb.config.load
 import pmb.parse.apkindex
@@ -165,8 +166,15 @@ def init(args):
     extract(args, version, apk_static)
 
 
-def run(args, parameters):
+# Wrap apk.static with proot to init the rootfs
+# cache is already bind-mounted
+def run(args, suffix, parameters, chroot=True):
     if args.offline:
         parameters = ["--no-network"] + parameters
-    pmb.helpers.apk.apk_with_progress(
-        args, [f"{args.work}/apk.static"] + parameters, chroot=False)
+    target_full = f"{args.work}/chroot_{suffix}/bin/apk.static" 
+    pmb.helpers.mount.bind(args, f"{args.work}/apk.static", target_full)
+    #pmb.chroot.root(args, ["/host-rootfs/usr/bin/uname", "-a"], suffix=suffix, disable_timeout=True, exists_check=False)
+    return pmb.chroot.root(args, ["/bin/apk.static"] + parameters, suffix=suffix,
+                               disable_timeout=True, exists_check=False)
+    # pmb.helpers.apk.apk_with_progress(
+    #     args, [f"{args.work}/apk.static"] + parameters, chroot=chroot, suffix=suffix)

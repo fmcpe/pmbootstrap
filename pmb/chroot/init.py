@@ -38,7 +38,7 @@ def mark_in_chroot(args, suffix="native"):
     """
     in_chroot_file = f"{args.work}/chroot_{suffix}/in-pmbootstrap"
     if not os.path.exists(in_chroot_file):
-        pmb.helpers.run.root(args, ["touch", in_chroot_file])
+        pmb.helpers.run.user(args, ["touch", in_chroot_file])
 
 
 def setup_qemu_emulation(args, suffix):
@@ -79,8 +79,11 @@ def init(args, suffix="native"):
     chroot = f"{args.work}/chroot_{suffix}"
     arch = pmb.parse.arch.from_chroot_suffix(args, suffix)
 
+    pmb.helpers.run.user(args, ["mkdir", "-p", f"{chroot}/tmp"])
+
     pmb.chroot.mount(args, suffix)
-    setup_qemu_emulation(args, suffix)
+    # Handled by proot
+    # setup_qemu_emulation(args, suffix)
     mark_in_chroot(args, suffix)
     if os.path.islink(f"{chroot}/bin/sh"):
         pmb.config.workdir.chroot_check_channel(args, suffix)
@@ -95,6 +98,7 @@ def init(args, suffix="native"):
 
     # Initialize cache
     apk_cache = f"{args.work}/cache_apk_{arch}"
+    pmb.helpers.run.root(args, ["mkdir", "-p", f"{chroot}/etc/apk/cache"])
     pmb.helpers.run.root(args, ["ln", "-s", "-f", "/var/cache/apk",
                                 f"{chroot}/etc/apk/cache"])
 
@@ -106,11 +110,13 @@ def init(args, suffix="native"):
     pmb.config.workdir.chroot_save_init(args, suffix)
 
     # Install alpine-base
+    # /home/cas/.local/var/pmbootstrap/apk.static
+    #   --root /home/cas/.local/var/pmbootstrap/chroot_rootfs_oneplus-fajita
+    #   --cache-dir /home/cas/.local/var/pmbootstrap/cache_apk_aarch64 --initdb
+    #   --arch aarch64 add alpine-base
     pmb.helpers.repo.update(args, arch)
-    pmb.chroot.apk_static.run(args, ["--root", chroot,
-                                     "--cache-dir", apk_cache,
-                                     "--initdb", "--arch", arch,
-                                     "add", "alpine-base"])
+    # wrap apk.static in proot!
+    pmb.chroot.apk_static.run(args, suffix, ["--initdb", "--arch", arch, "add", "alpine-base"])
 
     # Building chroots: create "pmos" user, add symlinks to /home/pmos
     if not suffix.startswith("rootfs_"):

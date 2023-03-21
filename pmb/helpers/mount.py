@@ -1,7 +1,23 @@
 # Copyright 2023 Oliver Smith
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
+import logging
 import pmb.helpers.run
+import pmb.config
+
+def dest_to_suffix(args, destination):
+    """
+    Convert a destination path to a chroot suffix.
+    """
+    target_relative = destination.replace(args.work, "")
+
+    if target_relative[0] == "/":
+        target_relative = target_relative[1:]
+    if not target_relative.startswith("chroot_"):
+        raise RuntimeError(f"Unknown proot target: {destination}")
+
+    target_relative = target_relative.split("/")
+    return "/" + "/".join(target_relative[1:]), target_relative[0].replace("chroot_", "")
 
 
 def ismount(folder):
@@ -19,12 +35,64 @@ def ismount(folder):
                 return True
     return False
 
+def proot_listmounts(args, suffix):
+    """
+    List all bindmounts for a proot call.
+    """
+    cfg = f"{args.work}/config_proot/proot_{suffix}.cfg"
+    if not os.path.exists(cfg):
+        return []
+    ret = []
+    with open(cfg, "r") as handle:
+        for line in handle:
+            ret.append(line.strip())
+    return ret
+
+def proot_bindmount(args, source, destination):
+    """
+    Store the bindmount in the proot config file, so that it is applied
+    to every proot call.
+    $WORK/config_proot/proot_<suffix>.cfg
+
+    We do this trickery to avoid manually fixing every usage of pmb.helpers.mount.bind()
+    ideally we fix it there....
+    """
+
+    target_relative, suffix = dest_to_suffix(args, destination)
+    cfg = f"{args.work}/config_proot/proot_{suffix}.cfg"
+
+    logging.verbose(f"{suffix}: proot_bindmount add {source}:{target_relative}")
+    if not os.path.exists(os.path.dirname(cfg)):
+        pmb.helpers.run.user(args, ["mkdir", "-p", os.path.dirname(cfg)])
+    elif target_relative in proot_listmounts(args, suffix):
+        return
+    with open(cfg, "a") as f:
+        f.write(f"{source}:{target_relative}\n")
+
+def proot_umount(args, destination):
+    """
+    Remove the bindmount from the proot config file.
+    """
+
+    target_relative, suffix = dest_to_suffix(args, destination)
+    cfg = f"{args.work}/config_proot/proot_{suffix}.cfg"
+
+    logging.verbose(f"{suffix}: proot_bindmount del {target_relative}")
+    pmb.helpers.run.user(args, ["sed", "-i", f"/{target_relative}/d", cfg])
 
 def bind(args, source, destination, create_folders=True, umount=False):
     """
     Mount --bind a folder and create necessary directory structure.
     :param umount: when destination is already a mount point, umount it first.
     """
+
+    if pmb.config.rootless:
+        if umount:
+            proot_umount(args, destination)
+        else:
+            proot_bindmount(args, source, destination)
+        return
+
     # Check/umount destination
     if ismount(destination):
         if umount:

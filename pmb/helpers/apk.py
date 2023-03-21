@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
 
-import pmb.chroot.root
+import pmb.chroot
 import pmb.config.pmaports
 import pmb.helpers.cli
 import pmb.helpers.run
@@ -22,8 +22,9 @@ def _run(args, command, chroot=False, suffix="native", output="log"):
     arguments and the return value.
     """
     if chroot:
+        # exists_check=False: avoid infinite recursion
         return pmb.chroot.root(args, command, output=output, suffix=suffix,
-                               disable_timeout=True)
+                               disable_timeout=True, exists_check=False)
     return pmb.helpers.run.root(args, command, output=output)
 
 

@@ -8,26 +8,24 @@ import pmb.chroot
 import pmb.chroot.binfmt
 import pmb.helpers.run
 import pmb.helpers.run_core
+from pmb.helpers.run import which
 
+def make_proot_cmd(args, suffix="native", working_dir="/"):
+    arch = pmb.parse.arch.from_chroot_suffix(args, suffix)
+    arch_qemu = pmb.parse.arch.alpine_to_qemu(arch)
+    cmd_chroot = [which("proot"), "-q", f"qemu-{arch_qemu}-static", "-w", working_dir]
+    bindmounts = pmb.helpers.mount.proot_listmounts(args, suffix)
+    # FIXME: SECURITY!!!! proot will make the host /dev /sys /proc /tmp and /run
+    # available to the chroot with -S
+    for bindmount in bindmounts:
+        cmd_chroot += ["-b", bindmount]
+    cmd_chroot += ["-S", f"{args.work}/chroot_{suffix}"]
 
-def executables_absolute_path():
-    """
-    Get the absolute paths to the sh and chroot executables.
-    """
-    ret = {}
-    for binary in ["sh", "chroot"]:
-        path = shutil.which(binary, path=pmb.config.chroot_host_path)
-        if not path:
-            raise RuntimeError(f"Could not find the '{binary}'"
-                               " executable. Make sure that it is in"
-                               " your current user's PATH.")
-        ret[binary] = path
-    return ret
-
+    return cmd_chroot
 
 def root(args, cmd, suffix="native", working_dir="/", output="log",
          output_return=False, check=None, env={}, auto_init=True,
-         disable_timeout=False):
+         disable_timeout=False, exists_check=True):
     """
     Run a command inside a chroot as root.
 
@@ -39,11 +37,12 @@ def root(args, cmd, suffix="native", working_dir="/", output="log",
     arguments and the return value.
     """
     # Initialize chroot
-    chroot = f"{args.work}/chroot_{suffix}"
-    if not auto_init and not os.path.islink(f"{chroot}/bin/sh"):
-        raise RuntimeError(f"Chroot does not exist: {chroot}")
-    if auto_init:
-        pmb.chroot.init(args, suffix)
+    chroot_path = f"{args.work}/chroot_{suffix}"
+    if exists_check:
+        if not auto_init and not os.path.islink(f"{chroot_path}/bin/sh"):
+            raise RuntimeError(f"Chroot does not exist: {chroot_path}")
+        if auto_init:
+            pmb.chroot.init(args, suffix)
 
     # Readable log message (without all the escaping)
     msg = f"({suffix}) % "
@@ -75,11 +74,18 @@ def root(args, cmd, suffix="native", working_dir="/", output="log",
     # cmd: ["echo", "test"]
     # cmd_chroot: ["/sbin/chroot", "/..._native", "/bin/sh", "-c", "echo test"]
     # cmd_sudo: ["sudo", "env", "-i", "sh", "-c", "PATH=... /sbin/chroot ..."]
-    executables = executables_absolute_path()
-    cmd_chroot = [executables["chroot"], chroot, "/bin/sh", "-c",
-                  pmb.helpers.run.flat_cmd(cmd, working_dir)]
-    cmd_sudo = [pmb.config.sudo, "env", "-i", executables["sh"], "-c",
-                pmb.helpers.run.flat_cmd(cmd_chroot, env=env_all)]
-    return pmb.helpers.run_core.core(args, msg, cmd_sudo, None, output,
+    cmd_chroot = []
+    if pmb.config.rootless:
+        cmd_chroot = make_proot_cmd(args, suffix, working_dir) + cmd# + ["/bin/sh_host", "-c",
+                    #pmb.helpers.run.flat_cmd(cmd)]
+        cmd_chroot = ["env", "-i", which("sh"), "-c",
+                    pmb.helpers.run.flat_cmd(cmd_chroot, env=env_all)]
+    else:
+        cmd_chroot += [which("chroot"), chroot_path, "/bin/sh", "-c",
+                    pmb.helpers.run.flat_cmd(cmd)]
+        cmd_chroot = [pmb.config.sudo, "env", "-i", which("sh"), "-c",
+                   pmb.helpers.run.flat_cmd(cmd_chroot, env=env_all)]
+
+    return pmb.helpers.run_core.core(args, msg, cmd_chroot, None, output,
                                      output_return, check, True,
                                      disable_timeout)

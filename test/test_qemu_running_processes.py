@@ -88,6 +88,9 @@ class QEMU(object):
 
         # Create and run rootfs
         pmbootstrap_yes(args, config, ["install", "--password", "y"])
+        if ui == "phosh":
+            pmb.chroot.root(args, ["echo", "\"export LIBGL_ALWAYS_SOFTWARE=true;export LIBGL_DRI2_DISABLE=true\"", ">>", "/etc/tinydm.d/env-wayland.d/50-libgl-virt.sh"], suffix="rootfs_qemu-amd64")
+            pmb.chroot.root(args, ["chmod", "+x", "/etc/tinydm.d/env-wayland.d/50-libgl-virt.sh"], suffix="rootfs_qemu-amd64")
         self.process = pmbootstrap_run(args, config, ["qemu", "--display",
                                                       "none"], "background")
 
@@ -186,3 +189,8 @@ def test_plasma_mobile(args, tmpdir, qemu):
     # check for more processes
     qemu.run(args, tmpdir, "plasma-mobile")
     assert is_running(args, ["polkitd"])
+
+@pytest.mark.skip_ci
+def test_phosh(args, tmpdir, qemu):
+    qemu.run(args, tmpdir, "phosh")
+    assert is_running(args, ["gnome-session-binary", "phoc", "phosh"])

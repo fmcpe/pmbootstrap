@@ -60,6 +60,9 @@ required_programs = [
 ]
 sudo = which_sudo()
 
+# Should pmbootstrap run without root permissions?
+rootless = True
+
 # Keys saved in the config file (mostly what we ask in 'pmbootstrap init')
 config_keys = ["aports",
                "ccache_size",
