@@ -15,41 +15,41 @@ def check_partition_blacklist(args, key, value):
                            "wiki page for more information.")
 
 
-def run(args, action, flavor=None):
+def _run(args, action, flavor=None):
     pmb.flasher.init(args)
 
     # Verify action
     method = args.flash_method or args.deviceinfo["flash_method"]
     cfg = pmb.config.flashers[method]
     if action not in cfg["actions"]:
-        raise RuntimeError("action " + action + " is not"
-                           " configured for method " + method + "!"
-                           " You can use the '--method' option to specify a"
-                           " different flash method. See also:"
-                           " <https://wiki.postmarketos.org/wiki/"
-                           "Deviceinfo_flash_methods>")
+        raise ValueError("action " + action + " is not"
+                         " configured for method " + method + "!"
+                         " You can use the '--method' option to specify a"
+                         " different flash method. See also:"
+                         " <https://wiki.postmarketos.org/wiki/"
+                         "Deviceinfo_flash_methods>")
 
     # Variable setup
     vars = pmb.flasher.variables(args, flavor, method)
 
     # vbmeta flasher requires vbmeta partition to be explicitly specified
     if action == "flash_vbmeta" and not vars["$PARTITION_VBMETA"]:
-        raise RuntimeError("Your device does not have 'vbmeta' partition"
-                           " specified; set"
-                           " 'deviceinfo_flash_fastboot_partition_vbmeta'"
-                           " or 'deviceinfo_flash_heimdall_partition_vbmeta'"
-                           " in deviceinfo file. See also:"
-                           " <https://wiki.postmarketos.org/wiki/"
-                           "Deviceinfo_reference>")
+        raise ValueError("Your device does not have 'vbmeta' partition"
+                         " specified; set"
+                         " 'deviceinfo_flash_fastboot_partition_vbmeta'"
+                         " or 'deviceinfo_flash_heimdall_partition_vbmeta'"
+                         " in deviceinfo file. See also:"
+                         " <https://wiki.postmarketos.org/wiki/"
+                         "Deviceinfo_reference>")
 
     # dtbo flasher requires dtbo partition to be explicitly specified
     if action == "flash_dtbo" and not vars["$PARTITION_DTBO"]:
-        raise RuntimeError("Your device does not have 'dtbo' partition"
-                           " specified; set"
-                           " 'deviceinfo_flash_fastboot_partition_dtbo'"
-                           " in deviceinfo file. See also:"
-                           " <https://wiki.postmarketos.org/wiki/"
-                           "Deviceinfo_reference>")
+        raise ValueError("Your device does not have 'dtbo' partition"
+                         " specified; set"
+                         " 'deviceinfo_flash_fastboot_partition_dtbo'"
+                         " in deviceinfo file. See also:"
+                         " <https://wiki.postmarketos.org/wiki/"
+                         "Deviceinfo_reference>")
 
     # Run the commands of each action
     for command in cfg["actions"][action]:
@@ -68,3 +68,11 @@ def run(args, action, flavor=None):
 
         # Run the action
         pmb.chroot.root(args, command, output="interactive")
+
+
+def run(args, action, flavor=None, ignore_errors=False):
+    try:
+        _run(args, action, flavor)
+    except ValueError as e:
+        if not ignore_errors:
+            raise ValueError(e)

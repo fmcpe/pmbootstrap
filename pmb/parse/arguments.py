@@ -277,6 +277,15 @@ def arguments_flasher(subparser):
                             help="partition to flash the dtbo to (defaults"
                             " to deviceinfo_flash_*_partition_dtbo)")
 
+    for action in [flash_kernel, flash_lk2nd, flash_rootfs,
+                   flash_vbmeta, flash_dtbo]:
+        extra = action.add_argument(dest="action_extra",
+                                    metavar="EXTRA",
+                                    help="Additional commands to flasher"
+                                         " (only fastboot supported)",
+                                    nargs="*")
+        extra.required = False
+
     # Actions without extra arguments
     sub.add_parser("sideload", help="sideload recovery zip")
     sub.add_parser("list_flavors", help="list installed kernel flavors" +

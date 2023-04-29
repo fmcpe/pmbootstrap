@@ -151,3 +151,10 @@ def frontend(args):
         sideload(args)
     if action in ["flash_lk2nd"]:
         flash_lk2nd(args)
+
+    extra = args.action_extra
+    if extra and "fastboot" in method and action != "boot":
+        logging.info(extra)
+        cmd = ["fastboot"]
+        cmd += extra
+        pmb.chroot.root(args, ["fastboot"] + extra, output="interactive")
