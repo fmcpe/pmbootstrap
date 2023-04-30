@@ -122,6 +122,11 @@ def flash_lk2nd(args):
     pmb.flasher.run(args, "flash_lk2nd")
 
 
+def flash_all(args):
+    for action in ["flash_rootfs", "flash_kernel", "flash_vbmeta", "flash_dtbo"]:
+        pmb.flasher.run(args, action, ignore_errors=True)
+
+
 def frontend(args):
     action = args.action_flasher
     method = args.flash_method or args.deviceinfo["flash_method"]
@@ -151,6 +156,8 @@ def frontend(args):
         sideload(args)
     if action in ["flash_lk2nd"]:
         flash_lk2nd(args)
+    if action == "flash_all":
+        flash_all(args)
 
     extra = args.action_extra
     if extra and "fastboot" in method and action != "boot":

@@ -277,8 +277,11 @@ def arguments_flasher(subparser):
                             help="partition to flash the dtbo to (defaults"
                             " to deviceinfo_flash_*_partition_dtbo)")
 
+    flash_all = sub.add_parser("flash_all",
+                               help="Flash all partitions needed for the device")
+
     for action in [flash_kernel, flash_lk2nd, flash_rootfs,
-                   flash_vbmeta, flash_dtbo]:
+                   flash_vbmeta, flash_dtbo, flash_all]:
         extra = action.add_argument(dest="action_extra",
                                     metavar="EXTRA",
                                     help="Additional commands to flasher"
