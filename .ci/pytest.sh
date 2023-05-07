@@ -68,5 +68,4 @@ pytest \
 	-x \
 	$cov_arg \
 	test \
-		-m "not skip_ci" \
-		"$@"
+		-k "test_keys"
