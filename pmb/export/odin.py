@@ -8,6 +8,7 @@ import pmb.chroot.apk
 import pmb.config
 import pmb.flasher
 import pmb.helpers.file
+from pmb.core import Suffix, SuffixType
 
 
 def odin(args, flavor, folder):
@@ -17,7 +18,7 @@ def odin(args, flavor, folder):
     and with boot.img for devices with 'heimdall-bootimg'
     """
     pmb.flasher.init(args)
-    suffix = "rootfs_" + args.device
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
 
     # Backwards compatibility with old mkinitfs (pma#660)
     suffix_flavor = f"-{flavor}"
@@ -41,7 +42,7 @@ def odin(args, flavor, folder):
 
     # Temporary folder
     temp_folder = "/tmp/odin-flashable-tar"
-    if os.path.exists(f"{args.work}/chroot_native{temp_folder}"):
+    if os.path.exists(f"{args.work}/{Suffix.native().chroot()}{temp_folder}"):
         pmb.chroot.root(args, ["rm", "-rf", temp_folder])
 
     # Odin flashable tar generation script
@@ -95,7 +96,7 @@ def odin(args, flavor, folder):
     pmb.chroot.root(args, ["rmdir", temp_folder], suffix)
 
     # Create the symlink
-    file = f"{args.work}/chroot_native/home/pmos/rootfs/{odin_device_tar_md5}"
+    file = f"{args.work}/{Suffix.native().chroot()}/home/pmos/rootfs/{odin_device_tar_md5}"
     link = f"{folder}/{odin_device_tar_md5}"
     pmb.helpers.file.symlink(args, file, link)
 

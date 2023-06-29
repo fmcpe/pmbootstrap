@@ -5,6 +5,7 @@ import os
 import re
 import glob
 import shlex
+from typing import Dict
 
 import pmb.chroot
 import pmb.chroot.apk
@@ -13,29 +14,16 @@ import pmb.chroot.initfs
 import pmb.config
 import pmb.config.pmaports
 import pmb.helpers.devices
+from pmb.helpers.mount import mount_device_rootfs
 import pmb.helpers.run
 import pmb.install.blockdevice
 import pmb.install.recovery
 import pmb.install.ui
 import pmb.install
+from pmb.core import Suffix, SuffixType
 
 
-def mount_device_rootfs(args, suffix_rootfs, suffix_mount="native"):
-    """
-    Mount the device rootfs.
-    :param suffix_rootfs: the chroot suffix, where the rootfs that will be
-                          installed on the device has been created (e.g.
-                          "rootfs_qemu-amd64")
-    :param suffix_mount: the chroot suffix, where the device rootfs will be
-                         mounted (e.g. "native")
-    """
-    mountpoint = f"/mnt/{suffix_rootfs}"
-    pmb.helpers.mount.bind(args, f"{args.work}/chroot_{suffix_rootfs}",
-                           f"{args.work}/chroot_{suffix_mount}{mountpoint}")
-    return mountpoint
-
-
-def get_subpartitions_size(args, suffix):
+def get_subpartitions_size(args, suffix: Suffix):
     """
     Calculate the size of the boot and root subpartition.
 
@@ -48,7 +36,7 @@ def get_subpartitions_size(args, suffix):
     # Estimate root partition size, then add some free space. The size
     # calculation is not as trivial as one may think, and depending on the
     # file system etc it seems to be just impossible to get it right.
-    chroot = f"{args.work}/chroot_{suffix}"
+    chroot = f"{args.work}/{suffix.chroot()}"
     root = pmb.helpers.other.folder_size(args, chroot) / 1024
     root *= 1.20
     root += 50 + int(args.extra_space)
@@ -102,7 +90,7 @@ def get_kernel_package(args, device):
     return ["device-" + device + "-kernel-" + args.kernel]
 
 
-def copy_files_from_chroot(args, suffix):
+def copy_files_from_chroot(args, suffix: Suffix):
     """
     Copy all files from the rootfs chroot to /mnt/install, except
     for the home folder (because /home will contain some empty
@@ -113,7 +101,7 @@ def copy_files_from_chroot(args, suffix):
     # Mount the device rootfs
     logging.info(f"(native) copy {suffix} to /mnt/install/")
     mountpoint = mount_device_rootfs(args, suffix)
-    mountpoint_outside = args.work + "/chroot_native" + mountpoint
+    mountpoint_outside = args.work + f"/{Suffix.native().chroot()}" + mountpoint
 
     # Remove empty qemu-user binary stub (where the binary was bind-mounted)
     arch_qemu = pmb.parse.arch.alpine_to_qemu(args.deviceinfo["arch"])
@@ -122,7 +110,7 @@ def copy_files_from_chroot(args, suffix):
         pmb.helpers.run.root(args, ["rm", qemu_binary])
 
     # Remove apk progress fifo
-    fifo = f"{args.work}/chroot_{suffix}/tmp/apk_progress_fifo"
+    fifo = f"{args.work}/{suffix.chroot()}/tmp/apk_progress_fifo"
     if os.path.exists(fifo):
         pmb.helpers.run.root(args, ["rm", fifo])
 
@@ -151,7 +139,7 @@ def create_home_from_skel(args):
     """
     Create /home/{user} from /etc/skel
     """
-    rootfs = args.work + "/chroot_native/mnt/install"
+    rootfs = args.work + f"/{Suffix.native().chroot()}/mnt/install"
     homedir = rootfs + "/home/" + args.user
     pmb.helpers.run.root(args, ["mkdir", rootfs + "/home"])
     if os.path.exists(f"{rootfs}/etc/skel"):
@@ -175,7 +163,7 @@ def configure_apk(args):
         pattern = f"{args.work}/config_apk_keys/*.pub"
 
     # Copy over keys
-    rootfs = args.work + "/chroot_native/mnt/install"
+    rootfs = args.work + f"/{Suffix.native().chroot()}/mnt/install"
     for key in glob.glob(pattern):
         pmb.helpers.run.root(args, ["cp", key, rootfs + "/etc/apk/keys/"])
 
@@ -200,7 +188,7 @@ def set_user(args):
     this was done to avoid conflict with Android UIDs/GIDs, but pmOS has since
     dropped support for hybris/Halium.
     """
-    suffix = "rootfs_" + args.device
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     if not pmb.chroot.user_exists(args, args.user, suffix):
         pmb.chroot.root(args, ["adduser", "-D", "-u", "10000", args.user],
                         suffix)
@@ -221,10 +209,10 @@ def setup_login_chpasswd_user_from_arg(args, suffix):
     any case.
 
     :param suffix: of the chroot, where passwd will be execute (either the
-                   f"rootfs_{args.device}", or f"installer_{args.device}")
+                   rootfs_{args.device} or installer_{args.device}
     """
     path = "/tmp/pmbootstrap_chpasswd_in"
-    path_outside = f"{args.work}/chroot_{suffix}{path}"
+    path_outside = f"{args.work}/{suffix.chroot()}{path}"
 
     with open(path_outside, "w", encoding="utf-8") as handle:
         handle.write(f"{args.user}:{args.password}")
@@ -254,7 +242,7 @@ def setup_login(args, suffix):
     root login.
 
     :param suffix: of the chroot, where passwd will be execute (either the
-                   f"rootfs_{args.device}", or f"installer_{args.device}")
+                   rootfs_{args.device} or installer_{args.device}
     """
     if not args.on_device_installer:
         # User password
@@ -296,13 +284,13 @@ def copy_ssh_keys(args):
                      "authentication!")
         return
 
-    authorized_keys = args.work + "/chroot_native/tmp/authorized_keys"
+    authorized_keys = args.work + f"/{Suffix.native().chroot()}/tmp/authorized_keys"
     outfile = open(authorized_keys, "w")
     for key in keys:
         outfile.write("%s" % key)
     outfile.close()
 
-    target = f"{args.work}/chroot_native/mnt/install/home/{args.user}/.ssh"
+    target = f"{args.work}/{Suffix.native().chroot()}/mnt/install/home/{args.user}/.ssh"
     pmb.helpers.run.root(args, ["mkdir", target])
     pmb.helpers.run.root(args, ["chmod", "700", target])
     pmb.helpers.run.root(args, ["cp", authorized_keys, target +
@@ -315,7 +303,7 @@ def setup_keymap(args):
     """
     Set the keymap with the setup-keymap utility if the device requires it
     """
-    suffix = "rootfs_" + args.device
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     info = pmb.parse.deviceinfo(args, device=args.device)
     if "keymaps" not in info or info["keymaps"].strip() == "":
         logging.info("NOTE: No valid keymap specified for device")
@@ -330,7 +318,7 @@ def setup_keymap(args):
 
         # Check xorg config
         config = None
-        if os.path.exists(f"{args.work}/chroot_{suffix}/etc/X11/xorg.conf.d"):
+        if os.path.exists(f"{args.work}/{suffix.chroot()}/etc/X11/xorg.conf.d"):
             config = pmb.chroot.root(args, ["grep", "-rl", "XkbLayout",
                                             "/etc/X11/xorg.conf.d/"],
                                      suffix, check=False, output_return=True)
@@ -355,7 +343,7 @@ def setup_keymap(args):
 
 
 def setup_timezone(args):
-    suffix = f"rootfs_{args.device}"
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
 
     arch = args.deviceinfo["arch"]
     alpine_conf = pmb.helpers.package.get(args, "alpine-conf", arch)
@@ -387,7 +375,7 @@ def setup_hostname(args):
         raise RuntimeError("Hostname '" + hostname + "' is not valid, please"
                            " run 'pmbootstrap init' to configure it.")
 
-    suffix = "rootfs_" + args.device
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     # Generate /etc/hostname
     pmb.chroot.root(args, ["sh", "-c", "echo " + shlex.quote(hostname) +
                            " > /etc/hostname"], suffix)
@@ -402,7 +390,7 @@ def setup_appstream(args):
     If alpine-appstream-downloader has been downloaded, execute it to have
     update AppStream data on new installs
     """
-    suffix = "rootfs_" + args.device
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     installed_pkgs = pmb.chroot.apk.installed(args, suffix)
 
     if "alpine-appstream-downloader" not in installed_pkgs or args.offline:
@@ -421,14 +409,14 @@ def disable_sshd(args):
         return
 
     # check=False: rc-update doesn't exit with 0 if already disabled
-    suffix = f"rootfs_{args.device}"
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     pmb.chroot.root(args, ["rc-update", "del", "sshd", "default"], suffix,
                     check=False)
 
     # Verify that it's gone
     sshd_files = pmb.helpers.run.root(
         args, ["find", "-name", "sshd"], output_return=True,
-        working_dir=f"{args.work}/chroot_{suffix}/etc/runlevels")
+        working_dir=f"{args.work}/{suffix.chroot()}/etc/runlevels")
     if sshd_files:
         raise RuntimeError(f"Failed to disable sshd service: {sshd_files}")
 
@@ -459,14 +447,14 @@ def disable_firewall(args):
         return
 
     # check=False: rc-update doesn't exit with 0 if already disabled
-    suffix = f"rootfs_{args.device}"
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     pmb.chroot.root(args, ["rc-update", "del", "nftables", "default"], suffix,
                     check=False)
 
     # Verify that it's gone
     nftables_files = pmb.helpers.run.root(
         args, ["find", "-name", "nftables"], output_return=True,
-        working_dir=f"{args.work}/chroot_{suffix}/etc/runlevels")
+        working_dir=f"{args.work}/{suffix.chroot()}/etc/runlevels")
     if nftables_files:
         raise RuntimeError(f"Failed to disable firewall: {nftables_files}")
 
@@ -512,17 +500,17 @@ def print_firewall_info(args):
     logging.info("For more information: https://postmarketos.org/firewall")
 
 
-def generate_binary_list(args, suffix, step):
+def generate_binary_list(args, suffix: Suffix, step):
     """
     Perform three checks prior to writing binaries to disk: 1) that binaries
     exist, 2) that binaries do not extend into the first partition, 3) that
     binaries do not overlap each other.
 
     :param suffix: of the chroot, which holds the firmware files (either the
-                   f"rootfs_{args.device}", or f"installer_{args.device}")
+                   rootfs_{args.device} or installer_{args.device}
     :param step: partition step size in bytes
     """
-    binary_ranges = {}
+    binary_ranges: Dict[int, int] = {}
     binary_list = []
     binaries = args.deviceinfo["sd_embed_firmware"].split(",")
 
@@ -533,7 +521,7 @@ def generate_binary_list(args, suffix, step):
         except ValueError:
             raise RuntimeError("Value for firmware binary offset is "
                                f"not valid: {offset}")
-        binary_path = os.path.join(args.work, f"chroot_{suffix}", "usr/share",
+        binary_path = os.path.join(args.work, f"{suffix.chroot()}", "usr/share",
                                    binary)
         if not os.path.exists(binary_path):
             raise RuntimeError("The following firmware binary does not "
@@ -572,7 +560,7 @@ def embed_firmware(args, suffix):
     for collisions with each other.
 
     :param suffix: of the chroot, which holds the firmware files (either the
-                   f"rootfs_{args.device}", or f"installer_{args.device}")
+                   rootfs_{args.device} or installer_{args.device}
     """
     if not args.deviceinfo["sd_embed_firmware"]:
         return
@@ -801,10 +789,10 @@ def print_flash_info(args):
         logging.info("* pmbootstrap flasher flash_rootfs")
         logging.info("  Flashes the generated rootfs image to your device:")
         if args.split:
-            logging.info(f"  {args.work}/chroot_native/home/pmos/rootfs/"
+            logging.info(f"  {args.work}/{Suffix.native().chroot()}/home/pmos/rootfs/"
                          f"{args.device}-rootfs.img")
         else:
-            logging.info(f"  {args.work}/chroot_native/home/pmos/rootfs/"
+            logging.info(f"  {args.work}/{Suffix.native().chroot()}/home/pmos/rootfs/"
                          f"{args.device}.img")
             logging.info("  (NOTE: This file has a partition table, which"
                          " contains /boot and / subpartitions. That way we"
@@ -836,10 +824,10 @@ def print_flash_info(args):
         logging.info("* pmbootstrap flasher flash_kernel")
         logging.info("  Flashes the kernel + initramfs to your device:")
         if requires_split:
-            logging.info(f"  {args.work}/chroot_native/home/pmos/rootfs/"
+            logging.info(f"  {args.work}/{Suffix.native().chroot()}/home/pmos/rootfs/"
                          f"{args.device}-boot.img")
         else:
-            logging.info(f"  {args.work}/chroot_rootfs_{args.device}/boot")
+            logging.info(f"  {args.work}/{Suffix(SuffixType.ROOTFS, args.device)}/boot")
 
     if "boot" in flasher_actions:
         logging.info("  (NOTE: " + method + " also supports booting"
@@ -847,7 +835,7 @@ def print_flash_info(args):
                      " Use 'pmbootstrap flasher boot' to do that.)")
 
     if "flash_lk2nd" in flasher_actions and \
-            os.path.exists(args.work + "/chroot_rootfs_" + args.device +
+            os.path.exists(f"{args.work}/{Suffix(SuffixType.ROOTFS, args.device)}"
                            "/boot/lk2nd.img"):
         logging.info("* Your device supports and may even require"
                      " flashing lk2nd. You should flash it before"
@@ -863,7 +851,7 @@ def print_flash_info(args):
 def install_recovery_zip(args, steps):
     logging.info(f"*** ({steps}/{steps}) CREATING RECOVERY-FLASHABLE ZIP ***")
     suffix = "buildroot_" + args.deviceinfo["arch"]
-    mount_device_rootfs(args, f"rootfs_{args.device}", suffix)
+    mount_device_rootfs(args, Suffix(SuffixType.ROOTFS, args.device), suffix)
     pmb.install.recovery.create_zip(args, suffix)
 
     # Flash information
@@ -875,7 +863,7 @@ def install_recovery_zip(args, steps):
 def install_on_device_installer(args, step, steps):
     # Generate the rootfs image
     if not args.ondev_no_rootfs:
-        suffix_rootfs = f"rootfs_{args.device}"
+        suffix_rootfs = Suffix(SuffixType.ROOTFS, args.device)
         install_system_image(args, 0, suffix_rootfs, step=step, steps=steps,
                              split=True)
         step += 2
@@ -888,14 +876,14 @@ def install_on_device_installer(args, step, steps):
                 get_kernel_package(args, args.device) +
                 get_nonfree_packages(args, args.device))
 
-    suffix_installer = f"installer_{args.device}"
+    suffix_installer = Suffix(SuffixType.INSTALLER, args.device)
     pmb.chroot.apk.install(args, packages, suffix_installer)
 
     # Move rootfs image into installer chroot
     img_path_dest = f"{args.work}/chroot_{suffix_installer}/var/lib/rootfs.img"
     if not args.ondev_no_rootfs:
         img = f"{args.device}-root.img"
-        img_path_src = f"{args.work}/chroot_native/home/pmos/rootfs/{img}"
+        img_path_src = f"{args.work}/{Suffix.native().chroot()}/home/pmos/rootfs/{img}"
         logging.info(f"({suffix_installer}) add {img} as /var/lib/rootfs.img")
         pmb.install.losetup.umount(args, img_path_src)
         pmb.helpers.run.root(args, ["mv", img_path_src, img_path_dest])
@@ -969,7 +957,7 @@ def create_device_rootfs(args, step, steps):
     logging.info(f'*** ({step}/{steps}) CREATE DEVICE ROOTFS ("{args.device}")'
                  ' ***')
 
-    suffix = f"rootfs_{args.device}"
+    suffix = Suffix(SuffixType.ROOTFS, args.device)
     # Create user before installing packages, so post-install scripts of
     # pmaports can figure out the username (legacy reasons: pmaports#820)
     set_user(args)
@@ -1099,7 +1087,7 @@ def install(args):
         # Runs install_system_image twice
         install_on_device_installer(args, step, steps)
     else:
-        install_system_image(args, 0, f"rootfs_{args.device}", step, steps,
+        install_system_image(args, 0, Suffix(SuffixType.ROOTFS, args.device), step, steps,
                              split=args.split, sdcard=args.sdcard)
 
     print_flash_info(args)

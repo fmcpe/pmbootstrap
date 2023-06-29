@@ -4,7 +4,6 @@
 import glob
 import os
 import pytest
-import shutil
 import sys
 
 import pmb_test  # noqa

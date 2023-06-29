@@ -10,12 +10,13 @@ import pmb.config
 import pmb.chroot
 import pmb.chroot.apk
 import pmb.helpers.run
+from pmb.core import Suffix
 
 
-def init_abuild_minimal(args, suffix="native"):
+def init_abuild_minimal(args, suffix: Suffix=Suffix.native()):
     """ Initialize a minimal chroot with abuild where one can do
         'abuild checksum'. """
-    marker = f"{args.work}/chroot_{suffix}/tmp/pmb_chroot_abuild_init_done"
+    marker = f"{args.work}/{suffix.chroot()}/tmp/pmb_chroot_abuild_init_done"
     if os.path.exists(marker):
         return
 
@@ -33,9 +34,9 @@ def init_abuild_minimal(args, suffix="native"):
     pathlib.Path(marker).touch()
 
 
-def init(args, suffix="native"):
+def init(args, suffix: Suffix=Suffix.native()):
     """ Initialize a chroot for building packages with abuild. """
-    marker = f"{args.work}/chroot_{suffix}/tmp/pmb_chroot_build_init_done"
+    marker = f"{args.work}/{suffix.chroot()}/tmp/pmb_chroot_build_init_done"
     if os.path.exists(marker):
         return
 
@@ -46,9 +47,9 @@ def init(args, suffix="native"):
                            build=False)
 
     # Generate package signing keys
-    chroot = args.work + "/chroot_" + suffix
+    chroot = f"{args.work}/{suffix.chroot()}"
     if not os.path.exists(args.work + "/config_abuild/abuild.conf"):
-        logging.info("(" + suffix + ") generate abuild keys")
+        logging.info(f"({suffix}) generate abuild keys")
         pmb.chroot.user(args, ["abuild-keygen", "-n", "-q", "-a"],
                         suffix, env={"PACKAGER": "pmos <pmos@local>"})
 

@@ -272,6 +272,8 @@ def upgrade(args, pkgname, git=True, stable=True) -> bool:
         if stable:
             return upgrade_stable_package(args, pkgname, package)
 
+    return False
+
 
 def upgrade_all(args) -> None:
     """

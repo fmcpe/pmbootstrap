@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pmb.chroot.root
 import pmb.helpers.run
+from pmb.core import Suffix
 
 
-def user(args, cmd, suffix="native", working_dir="/", output="log",
+def user(args, cmd, suffix: Suffix=Suffix.native(), working_dir="/", output="log",
          output_return=False, check=None, env={}, auto_init=True):
     """
     Run a command inside a chroot as "user". We always use the BusyBox
@@ -27,7 +28,7 @@ def user(args, cmd, suffix="native", working_dir="/", output="log",
                            output_return, check, {}, auto_init)
 
 
-def exists(args, username, suffix="native"):
+def exists(args, username, suffix: Suffix=Suffix.native()):
     """
     Checks if username exists in the system
 

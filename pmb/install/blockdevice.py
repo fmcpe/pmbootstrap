@@ -7,6 +7,7 @@ import pmb.helpers.mount
 import pmb.install.losetup
 import pmb.helpers.cli
 import pmb.config
+from pmb.core import Suffix
 
 
 def previous_install(args, path):
@@ -22,8 +23,8 @@ def previous_install(args, path):
             continue
         blockdevice_inside = "/dev/sdcardp1"
         pmb.helpers.mount.bind_file(args, blockdevice_outside,
-                                    args.work + '/chroot_native' +
-                                    blockdevice_inside)
+                                    f"{args.work}/{Suffix.native().chroot()}"
+                                    f"{blockdevice_inside}")
         try:
             label = pmb.chroot.root(args, ["blkid", "-s", "LABEL",
                                            "-o", "value",
@@ -33,7 +34,7 @@ def previous_install(args, path):
             logging.info("WARNING: Could not get block device label,"
                          " assume no previous installation on that partition")
 
-        pmb.helpers.run.root(args, ["umount", args.work + "/chroot_native" +
+        pmb.helpers.run.root(args, ["umount", args.work + f"/{Suffix.native().chroot()}" +
                                     blockdevice_inside])
     return "pmOS_boot" in label
 
@@ -54,7 +55,7 @@ def mount_sdcard(args, path):
                                " format this!")
     logging.info(f"(native) mount /dev/install (host: {path})")
     pmb.helpers.mount.bind_file(args, path,
-                                args.work + "/chroot_native/dev/install")
+                                args.work + f"/{Suffix.native().chroot()}/dev/install")
     if previous_install(args, path):
         if not pmb.helpers.cli.confirm(args, "WARNING: This device has a"
                                        " previous installation of pmOS."
@@ -78,7 +79,7 @@ def create_and_mount_image(args, size_boot, size_root, size_reserve,
     """
 
     # Short variables for paths
-    chroot = args.work + "/chroot_native"
+    chroot = args.work + f"/{Suffix.native().chroot()}"
     img_path_prefix = "/home/pmos/rootfs/" + args.device
     img_path_full = img_path_prefix + ".img"
     img_path_boot = img_path_prefix + "-boot.img"
@@ -126,7 +127,7 @@ def create_and_mount_image(args, size_boot, size_root, size_reserve,
         pmb.install.losetup.mount(args, img_path)
         device = pmb.install.losetup.device_by_back_file(args, img_path)
         pmb.helpers.mount.bind_file(args, device,
-                                    args.work + "/chroot_native" + mount_point)
+                                    args.work + f"/{Suffix.native().chroot()}" + mount_point)
 
 
 def create(args, size_boot, size_root, size_reserve, split, sdcard):
@@ -140,7 +141,7 @@ def create(args, size_boot, size_root, size_reserve, split, sdcard):
     :param sdcard: path to sdcard device (e.g. /dev/mmcblk0) or None
     """
     pmb.helpers.mount.umount_all(
-        args, args.work + "/chroot_native/dev/install")
+        args, args.work + f"/{Suffix.native().chroot()}/dev/install")
     if sdcard:
         mount_sdcard(args, sdcard)
     else:
