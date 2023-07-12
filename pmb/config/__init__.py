@@ -714,6 +714,10 @@ apkbuild_attributes = {
     "subpackages": {},
     "url": {},
 
+    # Denotes dependencies that aren't needed when
+    # bootstrapping the package.
+    "_bootstrap_exclude": {"array": True},
+
     # cross-compilers
     "makedepends_build": {"array": True},
     "makedepends_host": {"array": True},

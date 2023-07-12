@@ -112,7 +112,7 @@ def get_depends(args, apkbuild):
     return ret
 
 
-def build_depends(args, apkbuild, arch, strict):
+def build_depends(args, apkbuild, arch, strict, bootstrap=False):
     """
     Get and build dependencies with verbose logging messages.
 
@@ -121,6 +121,10 @@ def build_depends(args, apkbuild, arch, strict):
     # Get dependencies
     pkgname = apkbuild["pkgname"]
     depends = get_depends(args, apkbuild)
+    if bootstrap:
+        for pkg in depends:
+            if pkg in apkbuild["_bootstrap_exclude"]:
+                depends.remove(pkg)
     logging.verbose(pkgname + ": build/install dependencies: " +
                     ", ".join(depends))
 
@@ -183,7 +187,7 @@ def is_necessary_warn_depends(args, apkbuild, arch, force, depends_built):
 
 
 def init_buildenv(args, apkbuild, arch, strict=False, force=False, cross=None,
-                  suffix="native", skip_init_buildenv=False, src=None):
+                  suffix="native", skip_init_buildenv=False, src=None, bootstrap=False):
     """
     Build all dependencies, check if we need to build at all (otherwise we've
     just initialized the build environment for nothing) and then setup the
@@ -195,6 +199,7 @@ def init_buildenv(args, apkbuild, arch, strict=False, force=False, cross=None,
                                something during initialization of the build
                                environment (e.g. qemu aarch64 bug workaround)
     :param src: override source used to build the package with a local folder
+    :param bootstrap: whether to bootstrap the package
     :returns: True when the build is necessary (otherwise False)
     """
 
@@ -203,7 +208,7 @@ def init_buildenv(args, apkbuild, arch, strict=False, force=False, cross=None,
         depends_arch = pmb.config.arch_native
 
     # Build dependencies
-    depends, built = build_depends(args, apkbuild, depends_arch, strict)
+    depends, built = build_depends(args, apkbuild, depends_arch, strict, bootstrap)
 
     # Check if build is necessary
     if not is_necessary_warn_depends(args, apkbuild, arch, force, built):
@@ -359,7 +364,7 @@ def link_to_git_dir(args, suffix):
 
 
 def run_abuild(args, apkbuild, arch, strict=False, force=False, cross=None,
-               suffix="native", src=None):
+               suffix="native", src=None, bootstrap=False):
     """
     Set up all environment variables and construct the abuild command (all
     depending on the cross-compiler method and target architecture), copy
@@ -412,6 +417,11 @@ def run_abuild(args, apkbuild, arch, strict=False, force=False, cross=None,
     if args.go_mod_cache:
         env["GOMODCACHE"] = "/home/pmos/go/pkg/mod"
 
+    # If bootstrap is enabled, set an environment variable that the APKBUILD
+    # can use to adjust the build process for bootstrapping.
+    if bootstrap:
+        env["BOOTSTRAP"] = "1"
+
     # Build the abuild command
     cmd = ["abuild", "-D", "postmarketOS"]
     if strict or "pmb:strict" in apkbuild["options"]:
@@ -459,7 +469,7 @@ def finish(args, apkbuild, arch, output, strict=False, suffix="native"):
 
 
 def package(args, pkgname, arch=None, force=False, strict=False,
-            skip_init_buildenv=False, src=None):
+            skip_init_buildenv=False, src=None, bootstrap=False):
     """
     Build a package and its dependencies with Alpine Linux' abuild.
 
@@ -478,6 +488,8 @@ def package(args, pkgname, arch=None, force=False, strict=False,
                                something during initialization of the build
                                environment (e.g. qemu aarch64 bug workaround)
     :param src: override source used to build the package with a local folder
+    :param bootstrap: enables building a "bootstrap" version of the package for
+                      supported packages.
     :returns: None if the build was not necessary
               output path relative to the packages folder ("armhf/ab-1-r2.apk")
     """
@@ -491,17 +503,23 @@ def package(args, pkgname, arch=None, force=False, strict=False,
     if not apkbuild:
         return
 
+    if bootstrap:
+        force = True
+        if "pmb:bootstrap" not in apkbuild["options"]:
+            raise RuntimeError(f"{pkgname}: build invoked with --bootstrap but "
+                                "'pmb:bootstrap' not found in APKBUILD options.")
+
     # Detect the build environment (skip unnecessary builds)
     if not check_build_for_arch(args, pkgname, arch):
         return
     suffix = pmb.build.autodetect.suffix(apkbuild, arch)
     cross = pmb.build.autodetect.crosscompile(args, apkbuild, arch, suffix)
     if not init_buildenv(args, apkbuild, arch, strict, force, cross, suffix,
-                         skip_init_buildenv, src):
+                         skip_init_buildenv, src, bootstrap):
         return
 
     # Build and finish up
     (output, cmd, env) = run_abuild(args, apkbuild, arch, strict, force, cross,
-                                    suffix, src)
+                                    suffix, src, bootstrap)
     finish(args, apkbuild, arch, output, strict, suffix)
     return output
