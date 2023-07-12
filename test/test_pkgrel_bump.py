@@ -7,6 +7,7 @@ import pytest
 import sys
 
 import pmb_test  # noqa
+import pmb_test.git
 import pmb.helpers.pkgrel_bump
 import pmb.helpers.logging
 
@@ -38,7 +39,7 @@ def pmbootstrap(args, tmpdir, parameters, zero_exit=True):
     # Copy .git dir to fake pmaports
     dot_git = tmpdir + "/_aports/.git"
     if not os.path.exists(dot_git):
-        pmb_test.git.copy_dotgit(args, dot_git)
+        pmb_test.git.copy_dotgit(args, aports)
 
     try:
         pmb.helpers.run.user(args, ["./pmbootstrap.py", "--work=" + tmpdir,
