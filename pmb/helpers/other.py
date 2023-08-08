@@ -313,3 +313,11 @@ def init_cache():
              "pmb.helpers.repo.update": repo_update,
              "pmb.helpers.git.parse_channels_cfg": {},
              "pmb.config.pmaports.read_config": None}
+
+
+def is_remote(path):
+    """ Similar to is_remote() in abuild:
+        https://gitlab.alpinelinux.org/alpine/abuild/-/blob/master/abuild.in
+    """
+    return (path.startswith("http://") or path.startswith("https://") or
+            path.startswith("ftp://"))

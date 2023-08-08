@@ -89,6 +89,7 @@ def mount(args, suffix="native"):
         source = source.replace("$ARCH", arch)
         source = source.replace("$CHANNEL", channel)
         mountpoints[source] = target
+    mountpoints.update(pmb.helpers.repo.get_local_mirror_mountpoints(args))
 
     # Mount if necessary
     for source, target in mountpoints.items():

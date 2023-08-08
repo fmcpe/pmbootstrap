@@ -40,12 +40,14 @@ def hash(url, length=8):
     return ret
 
 
-def urls(args, user_repository=True, postmarketos_mirror=True, alpine=True):
+def urls(args, user_repository=True, postmarketos_mirror=True, alpine=True,
+         outside_path=False):
     """
     Get a list of repository URLs, as they are in /etc/apk/repositories.
     :param user_repository: add /mnt/pmbootstrap/packages
     :param postmarketos_mirror: add postmarketos mirror URLs
     :param alpine: add alpine mirror URLs
+    :param outside_path: get the paths outside of chroots for local mirrors
     :returns: list of mirror strings, like ["/mnt/pmbootstrap/packages",
                                             "http://...", ...]
     """
@@ -63,8 +65,14 @@ def urls(args, user_repository=True, postmarketos_mirror=True, alpine=True):
 
     # Upstream postmarketOS binary repository
     if postmarketos_mirror:
+        i = 0
         for mirror in args.mirrors_postmarketos:
-            ret.append(f"{mirror}{mirrordir_pmos}")
+            if outside_path or pmb.helpers.other.is_remote(mirror):
+                ret.append(f"{mirror}{mirrordir_pmos}")
+            else:
+                path = f"/mnt/pmbootstrap/local-mirror-postmarketOS-{i}/"
+                ret.append(f"{path}{mirrordir_pmos}")
+                i += 1
 
     # Upstream Alpine Linux repositories
     if alpine:
@@ -91,15 +99,18 @@ def apkindex_files(args, arch=None, user_repository=True, pmos=True,
         arch = pmb.config.arch_native
 
     ret = []
+    channel = pmb.config.pmaports.read_config(args)["channel"]
+
     # Local user repository (for packages compiled with pmbootstrap)
     if user_repository:
-        channel = pmb.config.pmaports.read_config(args)["channel"]
         ret = [f"{args.work}/packages/{channel}/{arch}/APKINDEX.tar.gz"]
 
     # Resolve the APKINDEX.$HASH.tar.gz files
-    for url in urls(args, False, pmos, alpine):
-        ret.append(args.work + "/cache_apk_" + arch + "/APKINDEX." +
-                   hash(url) + ".tar.gz")
+    for url in urls(args, False, pmos, alpine, True):
+        if pmb.helpers.other.is_remote(url):
+            ret.append(f"{args.work}/cache_apk_{arch}/APKINDEX.{hash(url)}.tar.gz")
+        else:  # URL is a local path
+            ret.append(f"{url}/{arch}/APKINDEX.tar.gz")
 
     return ret
 
@@ -143,7 +154,9 @@ def update(args, arch=None, force=False, existing_only=False):
 
             # Find update reason, possibly skip non-existing or known 404 files
             reason = None
-            if url_full in pmb.helpers.other.cache[cache_key]["404"]:
+            if not pmb.helpers.other.is_remote(url):
+                continue
+            elif url_full in pmb.helpers.other.cache[cache_key]["404"]:
                 # We already attempted to download this file once in this
                 # session
                 continue
@@ -185,6 +198,22 @@ def update(args, arch=None, force=False, existing_only=False):
     pmb.helpers.cli.progress_flush(args)
 
     return True
+
+
+def get_local_mirror_mountpoints(args):
+    ret = {}
+    i = 0
+
+    for mirror in args.mirrors_postmarketos:
+        if pmb.helpers.other.is_remote(mirror):
+            continue
+
+        assert mirror not in ret, f"local mirror {mirror} specified twice"
+
+        ret[mirror] = f"/mnt/pmbootstrap/local-mirror-postmarketOS-{i}"
+        i += 1
+
+    return ret
 
 
 def alpine_apkindex_path(args, repo="main", arch=None):
