@@ -64,14 +64,6 @@ def urls(args, user_repository=True, postmarketos_mirror=True, alpine=True):
     # Upstream postmarketOS binary repository
     if postmarketos_mirror:
         for mirror in args.mirrors_postmarketos:
-            # Remove "master" mirrordir to avoid breakage until bpo is adjusted
-            # (build.postmarketos.org#63) and to give potential other users of
-            # this flag a heads up.
-            if mirror.endswith("/master"):
-                logging.warning("WARNING: 'master' at the end of"
-                                " --mirror-pmOS is deprecated, the branch gets"
-                                " added automatically now!")
-                mirror = mirror[:-1 * len("master")]
             ret.append(f"{mirror}{mirrordir_pmos}")
 
     # Upstream Alpine Linux repositories
