@@ -1,6 +1,7 @@
 image: alpine/edge
 packages:
   - sudo
+  - npm
 sources:
   - https://git.sr.ht/~postmarketos/pmbootstrap
 tasks:
@@ -21,6 +22,9 @@ tasks:
   - pytest: |
       cd pmbootstrap
       sudo .ci/pytest.sh
+  - markdownlint: |
+      cd pmbootstrap
+      sudo .ci/markdownlint.sh
 artifacts:
   - ".local/var/pmbootstrap/log.txt"
   - ".local/var/pmbootstrap/log_testsuite.txt"
