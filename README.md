@@ -129,6 +129,81 @@ Generate a template for a new package:
 pmbootstrap newapkbuild "https://gitlab.com/postmarketOS/osk-sdl/-/archive/0.52/osk-sdl-0.52.tar.bz2"
 ```
 
+#### Automatic checksum
+
+pmbootstraup supports automatically generating checksums for local sources
+(package source files that live inside pmaports). You can enable this feature
+with the `auto_checksum` option in `~/.config/pmbootstrap.cfg`
+
+#### Dirty building
+
+During development, it can be common to rebuild the same package over and over
+again with small changes, this has historically required manually regenerating
+checksums and bumping the pkgrel. However with the auto-checksum feature and the
+`--dirty` build flag, this process can reduced to a single command.
+
+As a demo, enable auto-checksums with the above command, and then navigate to the pmaports repo with:
+
+```sh
+pmbootstrap config auto_checksum True
+cd $(pmbootstrap config aports)
+```
+
+Then, edit `main/hello-world/main.c` with your favourite editor, change the
+printf line. You also need to adjust the `check()` function in the APKBUILD file (`main/hello-world/APKBUILD`)
+
+```diff
+diff --git a/main/hello-world/APKBUILD b/main/hello-world/APKBUILD
+index b6ece3889eb8..f1327df1f517 100644
+--- a/main/hello-world/APKBUILD
++++ b/main/hello-world/APKBUILD
+@@ -15,7 +15,7 @@ build() {
+ 
+ check() {
+        cd "$srcdir"
+-       printf 'hello, world!\n' > expected
++       printf 'hello, pmbootstrap!\n' > expected
+        ./hello-world > real
+        diff -q expected real
+ }
+diff --git a/main/hello-world/main.c b/main/hello-world/main.c
+index 8ac5cc3eec52..c2d86c9d5624 100644
+--- a/main/hello-world/main.c
++++ b/main/hello-world/main.c
+@@ -2,6 +2,6 @@
+ 
+ int main()
+ {
+-       printf("hello, world!\n");
++       printf("hello, pmbootstrap!\n");
+        return 0;
+ }
+```
+
+Usually after modifying package sources, we need to re-generate the checksums
+and bump the package version so that pmbootstrap knows to rebuild it, and apk
+knows to install the new version. However, for local testing we can simply run:
+
+```sh
+pmbootstrap build --arch x86_64 --dirty hello-world
+```
+
+The `--dirty` flag, in tandem with the auto-checksum feature, will cause
+pmbootstrap to fix the checksum for `main.c` in-place and adjust the pkgver to
+include the current datetime. As long as your pmaports repository is up to date
+(check with `pmbootstrap pull`), this ensures that our locally build
+`hello-world` package is newer than the version from the binary repository.
+
+Finally, we can install and run our new package as follows:
+
+```sh
+pmbootstrap chroot
+
+$ apk add hello-world
+$ hello-world
+hello, pmbootstrap!
+```
+
 #### Default architecture
 
 Packages will be compiled for the architecture of the device running
