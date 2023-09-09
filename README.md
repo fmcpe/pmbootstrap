@@ -90,7 +90,16 @@ pmbootstrap status
 
 ### Packages
 
-Build `aports/main/hello-world`:
+All source packages are in the [pmaports package
+repository](https://gitlab.com/postmarketOS/pmaports), pmbootstrap will
+automatically clone this during init. You can quickly navigate to the pmaports
+git repository with
+
+```sh
+cd $(pmbootstrap config aports)
+```
+
+Build `main/hello-world`:
 
 ```sh
 pmbootstrap build hello-world
